@@ -30,15 +30,15 @@ pub async fn get_logout_route() -> Router<Arc<AppState>> {
 #[axum::debug_handler]
 pub async fn login(
     State(app_state): State<Arc<AppState>>,
-    Json(user_login): Json<UserLogin>,
+    Json(payload): Json<UserLogin>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = user::Entity::find()
-        .filter(user::Column::Username.eq(user_login.username))
+        .filter(user::Column::Username.eq(payload.username))
         .one(&app_state.db)
         .await?
         .ok_or(AppError::GenericError("User not found.".to_string()))?;
 
-    if !verify_password(&user.password, &user_login.password)? {
+    if !verify_password(&user.password, &payload.password)? {
         return Err(AppError::GenericError("Invalid user".to_string()));
     }
 

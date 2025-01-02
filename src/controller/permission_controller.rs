@@ -18,7 +18,7 @@ pub async fn get_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_permissions).post(create_permission))
         .route(
-            "/:permission_id",
+            "/{permission_id}",
             get(get_permission)
                 .put(update_permission)
                 .delete(delete_permission),
@@ -42,11 +42,11 @@ pub async fn get_permissions(
 #[axum::debug_handler]
 pub async fn create_permission(
     State(app_state): State<Arc<AppState>>,
-    Json(permission_request): Json<CreatePermissionRequest>,
+    Json(payload): Json<CreatePermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    permission_request.validate()?;
+    payload.validate()?;
 
-    let permission: PermissionSerializer = permission_request
+    let permission: PermissionSerializer = payload
         .into_active_model()
         .insert(&app_state.db)
         .await?
@@ -70,19 +70,19 @@ pub async fn get_permission(
 pub async fn update_permission(
     State(app_state): State<Arc<AppState>>,
     Path(permission_id): Path<i32>,
-    Json(permission_request): Json<CreatePermissionRequest>,
+    Json(payload): Json<CreatePermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let permission = permission::Entity::find_by_id(permission_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
-    permission_request.validate()?;
+    payload.validate()?;
 
     let mut permission: permission::ActiveModel = permission.into();
 
-    permission.name = Set(permission_request.name);
-    permission.code_name = Set(permission_request.code_name);
+    permission.name = Set(payload.name);
+    permission.code_name = Set(payload.code_name);
 
     let permission_serializer: PermissionSerializer =
         permission.update(&app_state.db).await?.into();

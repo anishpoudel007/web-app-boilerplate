@@ -22,7 +22,7 @@ pub async fn get_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_roles).post(create_role))
         .route(
-            "/:role_id",
+            "/{role_id}",
             get(get_role).put(update_role).delete(delete_role),
         )
 }
@@ -44,11 +44,11 @@ pub async fn get_roles(
 #[axum::debug_handler]
 pub async fn create_role(
     State(app_state): State<Arc<AppState>>,
-    Json(role_request): Json<CreateRoleRequest>,
+    Json(payload): Json<CreateRoleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    role_request.validate()?;
+    payload.validate()?;
 
-    let role: RoleSerializer = role_request
+    let role: RoleSerializer = payload
         .into_active_model()
         .insert(&app_state.db)
         .await?
@@ -72,18 +72,18 @@ pub async fn get_role(
 pub async fn update_role(
     State(app_state): State<Arc<AppState>>,
     Path(role_id): Path<i32>,
-    Json(role_request): Json<UpdateRoleRequest>,
+    Json(payload): Json<UpdateRoleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let role = role::Entity::find_by_id(role_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
-    role_request.validate()?;
+    payload.validate()?;
 
     let mut role: role::ActiveModel = role.into();
 
-    role.name = Set(role_request.name);
+    role.name = Set(payload.name);
 
     let role_serializer: RoleSerializer = role.update(&app_state.db).await?.into();
 

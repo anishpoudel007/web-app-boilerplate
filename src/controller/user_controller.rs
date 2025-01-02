@@ -30,17 +30,17 @@ pub async fn get_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(get_users).post(create_user))
         .route(
-            "/:user_id",
+            "/{user_id}",
             get(get_user).put(update_user).delete(delete_user),
         )
-        .route("/:user_id/roles", get(get_user_roles).post(assign_roles))
-        .route("/:user_id/roles/sync", post(sync_roles))
-        .route("/:user_id/roles/:role_id", delete(delete_role))
+        .route("/{user_id}/roles", get(get_user_roles).post(assign_roles))
+        .route("/{user_id}/roles/sync", post(sync_roles))
+        .route("/{user_id}/roles/{role_id}", delete(delete_role))
         .route(
-            "/:user_id/permissions",
+            "/{user_id}/permissions",
             get(get_user_permissions).post(assign_permissions),
         )
-        .route("/:user_id/permissions/sync", post(sync_permissions))
+        .route("/{user_id}/permissions/sync", post(sync_permissions))
 }
 
 #[axum::debug_handler()]
@@ -68,23 +68,22 @@ pub async fn get_users(
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(1);
 
+    let per_page = std::env::var("PER_PAGE")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(10);
+
     let users_count = user_query.clone().count(&app_state.db).await?;
 
-    let response_metadata = ResponseMetadata {
-        count: users_count,
-        per_page: 10,
-        total_page: users_count.div_ceil(10),
-        current_url: Some(original_uri.to_string()),
-        ..Default::default()
-    };
+    let response_metadata = ResponseMetadata::new(users_count, original_uri.to_string());
 
     let users: Vec<UserWithProfileSerializer> = user_query
         .order_by(user::Column::DateCreated, sea_orm::Order::Desc)
-        .paginate(&app_state.db, 10)
+        .paginate(&app_state.db, per_page)
         .fetch_page(page - 1)
         .await?
-        .iter()
-        .map(|user_with_profile| UserWithProfileSerializer::from(user_with_profile.clone()))
+        .into_iter()
+        .map(UserWithProfileSerializer::from)
         .collect();
 
     Ok(JsonResponse::paginate(users, response_metadata, None))
@@ -108,23 +107,21 @@ pub async fn get_user(
 #[axum::debug_handler]
 pub async fn create_user(
     State(app_state): State<Arc<AppState>>,
-    Json(user_request): Json<CreateUserRequest>,
+    Json(payload): Json<CreateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    user_request.validate()?;
+    payload.validate()?;
 
     let user_with_profile = app_state
         .db
         .transaction::<_, (user::Model, Option<user_profile::Model>), DbErr>(|txn| {
             Box::pin(async move {
-                let user = user::ActiveModel::from(user_request.clone())
-                    .insert(txn)
-                    .await?;
+                let user = user::ActiveModel::from(payload.clone()).insert(txn).await?;
 
                 let user_profile = user_profile::ActiveModel {
                     id: sea_orm::ActiveValue::NotSet,
                     user_id: Set(user.id),
-                    address: Set(Some(user_request.address)),
-                    mobile_number: Set(Some(user_request.mobile_number)),
+                    address: Set(Some(payload.address)),
+                    mobile_number: Set(Some(payload.mobile_number)),
                 }
                 .insert(txn)
                 .await?;
@@ -144,25 +141,25 @@ pub async fn create_user(
 pub async fn update_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
-    Json(user_request): Json<UpdateUserRequest>,
+    Json(payload): Json<UpdateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
-    user_request.validate()?;
+    payload.validate()?;
 
     let mut user: user::ActiveModel = user.into();
 
-    let password = match user_request.password {
+    let password = match payload.password {
         Some(pwd) => Set(pwd),
         None => NotSet,
     };
 
-    user.name = Set(user_request.name);
-    user.username = Set(user_request.username);
-    user.email = Set(user_request.email);
+    user.name = Set(payload.name);
+    user.username = Set(payload.username);
+    user.email = Set(payload.email);
     user.password = password;
 
     let user_serializer: UserSerializer = user.update(&app_state.db).await?.into();
@@ -198,8 +195,8 @@ pub async fn get_user_roles(
         .await?;
 
     let role_serializer: Vec<RoleSerializer> = user_with_roles
-        .iter()
-        .flat_map(|(_, role)| role.clone())
+        .into_iter()
+        .flat_map(|(_, role)| role)
         .map(RoleSerializer::from)
         .collect();
 
@@ -210,27 +207,27 @@ pub async fn get_user_roles(
 pub async fn assign_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
-    Json(user_roles_request): Json<UpdateUserRolesRequest>,
+    Json(payload): Json<UpdateUserRolesRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let _user = user::Entity::find_by_id(user_id)
+    let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
-    if user_roles_request.roles.is_empty() {
+    if payload.roles.is_empty() {
         return Err(AppError::GenericError("Empty roles".to_string()));
     }
 
     let existing_roles: HashSet<String> = user::Entity::find_by_id(user_id)
         .find_with_related(role::Entity)
-        .filter(role::Column::Name.is_in(&user_roles_request.roles))
+        .filter(role::Column::Name.is_in(&payload.roles))
         .all(&app_state.db)
         .await?
         .into_iter()
         .flat_map(|(_, roles)| roles.into_iter().map(|role| role.name))
         .collect();
 
-    let requested_roles: HashSet<String> = user_roles_request.roles.into_iter().collect();
+    let requested_roles: HashSet<String> = payload.roles.into_iter().collect();
     let roles_to_add: Vec<String> = requested_roles
         .difference(&existing_roles)
         .cloned()
@@ -282,8 +279,8 @@ pub async fn get_user_permissions(
         .await?;
 
     let permission_serializer: Vec<PermissionSerializer> = user_with_permissions
-        .iter()
-        .flat_map(|(_, permission)| permission.clone())
+        .into_iter()
+        .flat_map(|(_, permission)| permission)
         .map(PermissionSerializer::from)
         .collect();
 
@@ -294,33 +291,34 @@ pub async fn get_user_permissions(
 pub async fn assign_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
-    Json(user_permission_request): Json<UpdateUserPermissionRequest>,
+    Json(payload): Json<UpdateUserPermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let _user = user::Entity::find_by_id(user_id)
+    let user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
-    if user_permission_request.permissions.is_empty() {
-        return Err(AppError::GenericError("Empty permission".to_string()));
+    if payload.permissions.is_empty() {
+        return Err(AppError::GenericError("Empty permission.".to_string()));
     }
 
-    let user_permissions: Vec<String> = user::Entity::find_by_id(user_id)
-        .find_with_related(permission::Entity)
-        .filter(permission::Column::CodeName.is_in(user_permission_request.permissions.clone()))
+    // retrieve user-related permissions from the database
+    let user_permissions: Vec<String> = user_model
+        .find_related(permission::Entity)
+        .filter(permission::Column::CodeName.is_in(&payload.permissions))
         .all(&app_state.db)
         .await?
-        .iter()
-        .flat_map(|(_, permissions)| permissions.iter().map(|value| value.code_name.clone()))
+        .into_iter()
+        .map(|permission| permission.name)
         .collect();
 
-    let new_permissions: Vec<String> = user_permission_request
+    let permissions_to_add: Vec<String> = payload
         .permissions
         .into_iter()
         .filter(|permission| !user_permissions.contains(permission))
         .collect();
 
-    if new_permissions.is_empty() {
+    if permissions_to_add.is_empty() {
         return Ok(JsonResponse::data(
             None::<String>,
             Some("Already added.".to_string()),
@@ -328,7 +326,7 @@ pub async fn assign_permissions(
     }
 
     let new_permissions = permission::Entity::find()
-        .filter(permission::Column::CodeName.is_in(new_permissions))
+        .filter(permission::Column::CodeName.is_in(permissions_to_add))
         .all(&app_state.db)
         .await?;
 
@@ -357,15 +355,15 @@ pub async fn assign_permissions(
 pub async fn sync_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
-    Json(permission_request): Json<UpdateUserPermissionRequest>,
+    Json(payload): Json<UpdateUserPermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let _user = user::Entity::find_by_id(user_id)
+    let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
     let valid_permissions: HashSet<String> = permission::Entity::find()
-        .filter(permission::Column::CodeName.is_in(&permission_request.permissions))
+        .filter(permission::Column::CodeName.is_in(&payload.permissions))
         .all(&app_state.db)
         .await?
         .into_iter()
@@ -466,15 +464,15 @@ pub async fn sync_permissions(
 pub async fn sync_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
-    Json(role_request): Json<UpdateUserRolesRequest>,
+    Json(payload): Json<UpdateUserRolesRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let _user = user::Entity::find_by_id(user_id)
+    let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
     let valid_roles: HashSet<String> = role::Entity::find()
-        .filter(role::Column::Name.is_in(&role_request.roles))
+        .filter(role::Column::Name.is_in(&payload.roles))
         .all(&app_state.db)
         .await?
         .into_iter()
@@ -573,7 +571,7 @@ pub async fn delete_role(
     State(app_state): State<Arc<AppState>>,
     Path((user_id, role_id)): Path<(i32, i32)>,
 ) -> Result<impl IntoResponse, AppError> {
-    let _user = user::Entity::find_by_id(user_id)
+    let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
         .ok_or(AppError::GenericError("User not found.".to_string()))?;
