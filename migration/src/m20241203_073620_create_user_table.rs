@@ -13,9 +13,10 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto(User::Id))
                     .col(string(User::Name))
-                    .col(string(User::Username))
-                    .col(string(User::Email))
+                    .col(string_uniq(User::Username))
+                    .col(string_uniq(User::Email))
                     .col(string(User::Password))
+                    .col(boolean(User::IsSuperadmin).default(false))
                     .col(date_time(User::DateCreated))
                     .col(date_time_null(User::DateUpdated))
                     .to_owned(),
@@ -38,6 +39,7 @@ enum User {
     Username,
     Email,
     Password,
+    IsSuperadmin,
     DateCreated,
     DateUpdated,
 }

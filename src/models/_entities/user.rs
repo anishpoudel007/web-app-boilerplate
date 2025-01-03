@@ -12,6 +12,7 @@ pub struct Model {
     pub username: String,
     pub email: String,
     pub password: String,
+    pub is_superadmin: bool,
     pub date_created: DateTime,
     pub date_updated: Option<DateTime>,
 }

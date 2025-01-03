@@ -44,3 +44,11 @@ pub struct UserLogin {
     #[validate(length(min = 8, message = "Must have at least 8 characters"))]
     pub password: String,
 }
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UserRegisterRequest {
+    #[validate(length(min = 3, message = "Must have at least 3 characters"))]
+    pub username: String,
+    #[validate(length(min = 8, message = "Must have at least 8 characters"))]
+    pub password: String,
+}

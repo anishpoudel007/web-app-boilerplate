@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::routing::delete;
+use axum::Extension;
 use axum::{
     extract::{OriginalUri, Path, Query, State},
     response::IntoResponse,
@@ -15,6 +16,7 @@ use sea_orm::{
 use validator::Validate;
 
 use crate::api_response::{JsonResponse, ResponseMetadata};
+use crate::auth::auth_service::AuthService;
 use crate::error::AppError;
 use crate::form::{
     role_form::{UpdateUserPermissionRequest, UpdateUserRolesRequest},
@@ -48,7 +50,10 @@ pub async fn get_users(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
     OriginalUri(original_uri): OriginalUri,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "read_users").await?;
+
     let mut user_query = user::Entity::find().find_also_related(user_profile::Entity);
 
     if let Some(name) = params.get("name") {
@@ -93,7 +98,10 @@ pub async fn get_users(
 pub async fn get_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "read_user").await?;
+
     let user: UserWithProfileSerializer = user::Entity::find_by_id(user_id)
         .find_also_related(user_profile::Entity)
         .one(&app_state.db)
@@ -107,8 +115,11 @@ pub async fn get_user(
 #[axum::debug_handler]
 pub async fn create_user(
     State(app_state): State<Arc<AppState>>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<CreateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "create_user").await?;
+
     payload.validate()?;
 
     let user_with_profile = app_state
@@ -141,8 +152,11 @@ pub async fn create_user(
 pub async fn update_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<UpdateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "update_user").await?;
+
     let user = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
@@ -171,7 +185,10 @@ pub async fn update_user(
 pub async fn delete_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "delete_user").await?;
+
     let res = user::Entity::delete_by_id(user_id)
         .exec(&app_state.db)
         .await?;
@@ -188,7 +205,10 @@ pub async fn delete_user(
 pub async fn get_user_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "read_user_roles").await?;
+
     let user_with_roles = user::Entity::find_by_id(user_id)
         .find_with_related(role::Entity)
         .all(&app_state.db)
@@ -207,8 +227,11 @@ pub async fn get_user_roles(
 pub async fn assign_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<UpdateUserRolesRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "assign_roles").await?;
+
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
@@ -272,7 +295,10 @@ pub async fn assign_roles(
 pub async fn get_user_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "read_user_permissions").await?;
+
     let user_with_permissions = user::Entity::find_by_id(user_id)
         .find_with_related(permission::Entity)
         .all(&app_state.db)
@@ -291,8 +317,11 @@ pub async fn get_user_permissions(
 pub async fn assign_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<UpdateUserPermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "assign_permissions").await?;
+
     let user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
@@ -355,8 +384,11 @@ pub async fn assign_permissions(
 pub async fn sync_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<UpdateUserPermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "sync_permissions").await?;
+
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
@@ -464,8 +496,11 @@ pub async fn sync_permissions(
 pub async fn sync_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<UpdateUserRolesRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "sync_roles").await?;
+
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
@@ -570,7 +605,10 @@ pub async fn sync_roles(
 pub async fn delete_role(
     State(app_state): State<Arc<AppState>>,
     Path((user_id, role_id)): Path<(i32, i32)>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "delete_user_role").await?;
+
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?

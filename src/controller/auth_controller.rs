@@ -4,14 +4,18 @@ use crate::{
     api_response::JsonResponse,
     auth::jwt::{create_user_token, UserToken},
     error::AppError,
-    form::user_form::UserLogin,
-    models::_entities::user,
+    form::user_form::{CreateUserRequest, UserLogin, UserRegisterRequest},
+    models::_entities::{user, user_profile},
+    serializer::UserWithProfileSerializer,
     utils::verify_password,
     AppState,
 };
 
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait as _, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait as _,
+};
+use validator::Validate as _;
 
 pub async fn get_routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -20,11 +24,51 @@ pub async fn get_routes() -> Router<Arc<AppState>> {
 }
 
 pub async fn get_login_route() -> Router<Arc<AppState>> {
-    Router::new().route("/login", post(login))
+    Router::new()
+        .route("/login", post(login))
+        .route("/register", post(register))
 }
 
 pub async fn get_logout_route() -> Router<Arc<AppState>> {
     Router::new().route("/logout", post(logout))
+}
+
+#[axum::debug_handler]
+pub async fn register(
+    State(app_state): State<Arc<AppState>>,
+    Json(payload): Json<CreateUserRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    payload.validate()?;
+
+    let user_with_profile = app_state
+        .db
+        .transaction::<_, (user::Model, Option<user_profile::Model>), sea_orm::DbErr>(|txn| {
+            Box::pin(async move {
+                let user = user::ActiveModel::from(payload.clone()).insert(txn).await?;
+
+                let user_profile = user_profile::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    user_id: Set(user.id),
+                    address: Set(Some(payload.address)),
+                    mobile_number: Set(Some(payload.mobile_number)),
+                }
+                .insert(txn)
+                .await?;
+
+                Ok((user, Some(user_profile)))
+            })
+        })
+        .await
+        .map_err(|e| {
+            println!("{:#?}", e);
+            AppError::GenericError(e.to_string())
+        })?; // should be database error
+
+    let user_serializer = UserWithProfileSerializer::from(user_with_profile);
+
+    println!("{:#?}", user_serializer);
+
+    Ok(JsonResponse::data(user_serializer, None))
 }
 
 #[axum::debug_handler]

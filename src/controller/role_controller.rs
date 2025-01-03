@@ -4,16 +4,17 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     routing::get,
-    Json, Router,
+    Extension, Json, Router,
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, Set};
 use validator::Validate;
 
 use crate::{
     api_response::JsonResponse,
+    auth::auth_service::AuthService,
     error::AppError,
     form::role_form::{CreateRoleRequest, UpdateRoleRequest},
-    models::_entities::role,
+    models::_entities::{role, user},
     serializer::RoleSerializer,
     AppState,
 };
@@ -30,12 +31,15 @@ pub async fn get_routes() -> Router<Arc<AppState>> {
 #[axum::debug_handler]
 pub async fn get_roles(
     State(app_state): State<Arc<AppState>>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "read_roles").await?;
+
     let roles: Vec<RoleSerializer> = role::Entity::find()
         .all(&app_state.db)
         .await?
-        .iter()
-        .map(|role| RoleSerializer::from(role.clone()))
+        .into_iter()
+        .map(RoleSerializer::from)
         .collect();
 
     Ok(JsonResponse::data(roles, None))
@@ -44,8 +48,11 @@ pub async fn get_roles(
 #[axum::debug_handler]
 pub async fn create_role(
     State(app_state): State<Arc<AppState>>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<CreateRoleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "create_role").await?;
+
     payload.validate()?;
 
     let role: RoleSerializer = payload
@@ -60,7 +67,10 @@ pub async fn create_role(
 pub async fn get_role(
     State(app_state): State<Arc<AppState>>,
     Path(role_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "read_role").await?;
+
     let role_serializer: RoleSerializer = role::Entity::find_by_id(role_id)
         .one(&app_state.db)
         .await?
@@ -72,8 +82,11 @@ pub async fn get_role(
 pub async fn update_role(
     State(app_state): State<Arc<AppState>>,
     Path(role_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
     Json(payload): Json<UpdateRoleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "update_role").await?;
+
     let role = role::Entity::find_by_id(role_id)
         .one(&app_state.db)
         .await?
@@ -92,7 +105,10 @@ pub async fn update_role(
 pub async fn delete_role(
     State(app_state): State<Arc<AppState>>,
     Path(role_id): Path<i32>,
+    Extension(user_model): Extension<user::Model>,
 ) -> Result<impl IntoResponse, AppError> {
+    AuthService::has_permission(&app_state, &user_model, "delete_role").await?;
+
     let res = role::Entity::delete_by_id(role_id)
         .exec(&app_state.db)
         .await?;
