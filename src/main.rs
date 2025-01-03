@@ -1,8 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use axum::{http::StatusCode, Router};
+use axum::{error_handling::HandleErrorLayer, http::StatusCode, BoxError, Router};
 use sea_orm::{Database, DatabaseConnection};
 use tokio::{net::TcpListener, signal};
+use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_http::trace::TraceLayer;
 
 mod api_response;
@@ -86,6 +87,17 @@ async fn create_app() -> Router {
             controller::auth_controller::get_login_route().await,
         )
         .with_state(app_state)
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled error: {}", err),
+                    )
+                }))
+                .layer(BufferLayer::new(1024))
+                .layer(RateLimitLayer::new(1000, Duration::from_secs(60))),
+        )
         .fallback(fallback_handler)
         .layer(TraceLayer::new_for_http())
 }
