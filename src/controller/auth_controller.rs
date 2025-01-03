@@ -51,7 +51,9 @@ pub async fn register(
         .await?;
 
     if user_exist.is_some() {
-        return Err(AppError::GenericError("User already exists.".to_string()));
+        return Err(AppError::GenericError(
+            "A user with this email or username already exists.".to_string(),
+        ));
     }
 
     let user_with_profile = app_state
