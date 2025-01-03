@@ -9,6 +9,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use sea_orm::Condition;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DbErr, EntityTrait, ModelTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
@@ -121,6 +122,19 @@ pub async fn create_user(
     AuthService::has_permission(&app_state, &user_model, "create_user").await?;
 
     payload.validate()?;
+
+    let user_exist = user::Entity::find()
+        .filter(
+            Condition::any()
+                .add(user::Column::Email.eq(&payload.email))
+                .add(user::Column::Username.eq(&payload.username)),
+        )
+        .one(&app_state.db)
+        .await?;
+
+    if user_exist.is_some() {
+        return Err(AppError::GenericError("User already exists.".to_string()));
+    }
 
     let user_with_profile = app_state
         .db

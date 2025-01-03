@@ -13,7 +13,8 @@ use crate::{
 
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use sea_orm::{
-    ActiveModelTrait as _, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait as _,
+    ActiveModelTrait as _, ColumnTrait, Condition, EntityTrait, QueryFilter, Set,
+    TransactionTrait as _,
 };
 use validator::Validate as _;
 
@@ -39,6 +40,19 @@ pub async fn register(
     Json(payload): Json<CreateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     payload.validate()?;
+
+    let user_exist = user::Entity::find()
+        .filter(
+            Condition::any()
+                .add(user::Column::Email.eq(&payload.email))
+                .add(user::Column::Username.eq(&payload.username)),
+        )
+        .one(&app_state.db)
+        .await?;
+
+    if user_exist.is_some() {
+        return Err(AppError::GenericError("User already exists.".to_string()));
+    }
 
     let user_with_profile = app_state
         .db
