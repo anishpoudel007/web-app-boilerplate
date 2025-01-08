@@ -23,6 +23,7 @@ mod utils;
 
 #[derive(Debug, Deserialize, Clone)]
 struct AppConfig {
+    app_debug: bool,
     server_address: String,
     database_url: String,
     per_page: i32,
@@ -45,18 +46,20 @@ struct AppState {
 async fn main() {
     dotenvy::dotenv().expect("Unable to access .env file");
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .pretty()
-        .with_ansi(true)
-        .init();
-
     let app_config: AppConfig = config::Config::builder()
         .add_source(config::Environment::default())
         .build()
         .unwrap()
         .try_deserialize()
         .unwrap();
+
+    if app_config.app_debug {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .pretty()
+            .with_ansi(true)
+            .init();
+    }
 
     tracing::info!("{:#?}", app_config);
 
