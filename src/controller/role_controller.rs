@@ -13,6 +13,7 @@ use crate::{
     api_response::JsonResponse,
     auth::auth_service::AuthService,
     error::AppError,
+    extractor::ValidJson,
     form::role_form::{CreateRoleRequest, UpdateRoleRequest},
     models::_entities::{role, user},
     serializer::RoleSerializer,
@@ -49,7 +50,7 @@ pub async fn get_roles(
 pub async fn create_role(
     State(app_state): State<Arc<AppState>>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<CreateRoleRequest>,
+    ValidJson(payload): ValidJson<CreateRoleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "create_role").await?;
 
@@ -83,7 +84,7 @@ pub async fn update_role(
     State(app_state): State<Arc<AppState>>,
     Path(role_id): Path<i32>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<UpdateRoleRequest>,
+    ValidJson(payload): ValidJson<UpdateRoleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "update_role").await?;
 

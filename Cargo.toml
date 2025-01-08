@@ -50,6 +50,9 @@ lettre = { version="0.11" }
 # Template engine
 sailfish = { version="0.9.0", features=["derive", "serde", "serde_json"]}
 
+# Config
+config = "0.15.4"
+
 [dev-dependencies]
 # Development utilities
 tower = { version = "0.5.2", features = ["util"] }

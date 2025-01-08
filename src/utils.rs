@@ -35,11 +35,9 @@ pub fn verify_password(hex_code: &str, to_verify: &str) -> Result<bool, AppError
 }
 
 pub async fn verify_token(app_state: Arc<AppState>, token: &str) -> Result<user::Model, AppError> {
-    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT Secret not set.");
-
     let token_claim = decode::<TokenClaims>(
         token,
-        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &DecodingKey::from_secret(app_state.config.jwt_secret.as_ref()),
         &Validation::default(),
     )
     .map_err(|_| AppError::GenericError("Invalid Token".to_string()))?;

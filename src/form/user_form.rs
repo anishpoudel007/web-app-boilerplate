@@ -15,7 +15,9 @@ pub struct CreateUserRequest {
     #[validate(email(message = "Please provide valid email."))]
     pub email: String,
 
+    #[validate(length(min = 8, message = "Must have at least 8 characters"))]
     pub password: String,
+
     pub address: String,
     pub mobile_number: String,
 }
@@ -55,7 +57,7 @@ pub struct UserLogin {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct UserRegisterRequest {
-    #[validate(length(min = 3, message = "Must have at least 3 characters"))]
+    #[validate(length(min = 5, message = "Must have at least 3 characters"))]
     pub username: String,
 
     #[validate(length(min = 8, message = "Must have at least 8 characters"))]

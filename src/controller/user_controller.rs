@@ -19,6 +19,7 @@ use validator::Validate;
 use crate::api_response::{JsonResponse, ResponseMetadata};
 use crate::auth::auth_service::AuthService;
 use crate::error::AppError;
+use crate::extractor::ValidJson;
 use crate::form::{
     role_form::{UpdateUserPermissionRequest, UpdateUserRolesRequest},
     user_form::{CreateUserRequest, UpdateUserRequest},
@@ -74,18 +75,14 @@ pub async fn get_users(
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(1);
 
-    let per_page = std::env::var("PER_PAGE")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(10);
-
     let users_count = user_query.clone().count(&app_state.db).await?;
 
-    let response_metadata = ResponseMetadata::new(users_count, original_uri.to_string());
+    let response_metadata =
+        ResponseMetadata::new(&app_state, users_count, original_uri.to_string());
 
     let users: Vec<UserWithProfileSerializer> = user_query
         .order_by(user::Column::DateCreated, sea_orm::Order::Desc)
-        .paginate(&app_state.db, per_page)
+        .paginate(&app_state.db, app_state.config.per_page as u64)
         .fetch_page(page - 1)
         .await?
         .into_iter()
@@ -117,7 +114,7 @@ pub async fn get_user(
 pub async fn create_user(
     State(app_state): State<Arc<AppState>>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<CreateUserRequest>,
+    ValidJson(payload): ValidJson<CreateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "create_user").await?;
 
@@ -169,7 +166,7 @@ pub async fn update_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<UpdateUserRequest>,
+    ValidJson(payload): ValidJson<UpdateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "update_user").await?;
 
@@ -244,7 +241,7 @@ pub async fn assign_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<UpdateUserRolesRequest>,
+    ValidJson(payload): ValidJson<UpdateUserRolesRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "assign_roles").await?;
 
@@ -334,7 +331,7 @@ pub async fn assign_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<UpdateUserPermissionRequest>,
+    ValidJson(payload): ValidJson<UpdateUserPermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "assign_permissions").await?;
 
@@ -401,7 +398,7 @@ pub async fn sync_permissions(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<UpdateUserPermissionRequest>,
+    ValidJson(payload): ValidJson<UpdateUserPermissionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "sync_permissions").await?;
 
@@ -513,7 +510,7 @@ pub async fn sync_roles(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
     Extension(user_model): Extension<user::Model>,
-    Json(payload): Json<UpdateUserRolesRequest>,
+    ValidJson(payload): ValidJson<UpdateUserRolesRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "sync_roles").await?;
 

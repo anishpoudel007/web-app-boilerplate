@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use axum::{response::IntoResponse, Json};
 use serde::Serialize;
 use serde_json::{json, Value};
+
+use crate::AppState;
 
 #[derive(Serialize)]
 pub enum JsonResponse {
@@ -73,11 +77,8 @@ impl JsonResponse {
 }
 
 impl ResponseMetadata {
-    pub fn new(count: u64, url: String) -> Self {
-        let per_page = std::env::var("PER_PAGE")
-            .ok()
-            .and_then(|value| value.parse::<u64>().ok())
-            .unwrap_or(10);
+    pub fn new(ctx: &Arc<AppState>, count: u64, url: String) -> Self {
+        let per_page = ctx.config.per_page as u64;
 
         Self {
             count,

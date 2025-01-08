@@ -4,6 +4,7 @@ use crate::{
     api_response::JsonResponse,
     auth::jwt::{create_user_token, UserToken},
     error::AppError,
+    extractor::ValidJson,
     form::user_form::{CreateUserRequest, UserLogin},
     mails::auth_mails::send_register_mail,
     models::_entities::{user, user_profile},
@@ -38,7 +39,7 @@ pub async fn get_logout_route() -> Router<Arc<AppState>> {
 #[axum::debug_handler]
 pub async fn register(
     State(app_state): State<Arc<AppState>>,
-    Json(payload): Json<CreateUserRequest>,
+    ValidJson(payload): ValidJson<CreateUserRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     payload.validate()?;
 
@@ -87,7 +88,7 @@ pub async fn register(
 
     println!("{:#?}", user_serializer);
 
-    send_register_mail("User Registration Complete", &user_email)
+    send_register_mail(app_state, "User Registration Complete", &user_email)
         .map_err(AppError::GenericError)?;
 
     Ok(JsonResponse::data(user_serializer, None))
@@ -96,8 +97,10 @@ pub async fn register(
 #[axum::debug_handler]
 pub async fn login(
     State(app_state): State<Arc<AppState>>,
-    Json(payload): Json<UserLogin>,
+    ValidJson(payload): ValidJson<UserLogin>,
 ) -> Result<impl IntoResponse, AppError> {
+    payload.validate()?;
+
     let user = user::Entity::find()
         .filter(user::Column::Username.eq(payload.username))
         .one(&app_state.db)
@@ -108,18 +111,23 @@ pub async fn login(
         return Err(AppError::GenericError("Invalid user".to_string()));
     }
 
-    let access_token_expiration_minutes = std::env::var("ACCESS_TOKEN_EXPIRATION_MINUTES")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(10);
+    let app_config = app_state.config.to_owned();
 
-    let refresh_token_expiration_minutes = std::env::var("ACCESS_TOKEN_EXPIRATION_MINUTES")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(1440);
+    let access_token = create_user_token(
+        &user.email,
+        app_config.access_token_expiration_minutes,
+        &app_config.jwt_secret,
+    )
+    .await
+    .map_err(AppError::GenericError)?;
 
-    let access_token = create_user_token(&user.email, access_token_expiration_minutes).await;
-    let refresh_token = create_user_token(&user.email, refresh_token_expiration_minutes).await;
+    let refresh_token = create_user_token(
+        &user.email,
+        app_config.refresh_token_expiration_minutes,
+        &app_config.jwt_secret,
+    )
+    .await
+    .map_err(AppError::GenericError)?;
 
     let user_token = UserToken {
         access_token,

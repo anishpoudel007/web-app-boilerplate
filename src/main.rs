@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use axum::{http::StatusCode, Router};
+use controller::{
+    auth_controller, permission_controller, role_controller, user_controller, user_role_controller,
+};
 use sea_orm::{Database, DatabaseConnection};
+use serde::Deserialize;
 use tokio::{net::TcpListener, signal};
 use tower_http::trace::TraceLayer;
 
@@ -9,6 +13,7 @@ mod api_response;
 mod auth;
 mod controller;
 mod error;
+mod extractor;
 mod form;
 mod mails;
 mod middlewares;
@@ -16,9 +21,24 @@ mod models;
 mod serializer;
 mod utils;
 
+#[derive(Debug, Deserialize, Clone)]
+struct AppConfig {
+    server_address: String,
+    database_url: String,
+    per_page: i32,
+    jwt_secret: String,
+    access_token_expiration_minutes: i64,
+    refresh_token_expiration_minutes: i64,
+    smtp_host: String,
+    smtp_username: String,
+    smtp_password: String,
+    from_email: String,
+}
+
 #[derive(Clone, Debug)]
 struct AppState {
     db: DatabaseConnection,
+    config: AppConfig,
 }
 
 #[tokio::main]
@@ -31,15 +51,22 @@ async fn main() {
         .with_ansi(true)
         .init();
 
-    let server_address = std::env::var("SERVER_ADDRESS").expect("Server Address not found");
+    let app_config: AppConfig = config::Config::builder()
+        .add_source(config::Environment::default())
+        .build()
+        .unwrap()
+        .try_deserialize()
+        .unwrap();
 
-    tracing::info!("Listening on {}", server_address);
+    tracing::info!("{:#?}", app_config);
 
-    let listener = TcpListener::bind(server_address.clone())
+    tracing::info!("Listening on {}", app_config.server_address);
+
+    let listener = TcpListener::bind(&app_config.server_address)
         .await
         .expect("Could not create TCP Listener");
 
-    let app = create_app().await;
+    let app = create_app(app_config).await;
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -47,45 +74,31 @@ async fn main() {
         .unwrap();
 }
 
-async fn create_app() -> Router {
-    let database_url = std::env::var("DATABASE_URL").expect("Database url not found");
-
-    let db = Database::connect(&database_url)
+async fn create_app(app_config: AppConfig) -> Router {
+    let db = Database::connect(&app_config.database_url)
         .await
         .expect("Cannot connect to a database");
 
-    let app_state = Arc::new(AppState { db });
+    let app_state = Arc::new(AppState {
+        db,
+        config: app_config,
+    });
 
     Router::new()
-        .nest(
-            "/api/users",
-            controller::user_controller::get_routes().await,
-        )
+        .nest("/api/users", user_controller::get_routes().await)
         .nest(
             "/api/permissions",
-            controller::permission_controller::get_routes().await,
+            permission_controller::get_routes().await,
         )
-        .nest(
-            "/api/roles",
-            controller::role_controller::get_routes().await,
-        )
-        .nest(
-            "/api/user_roles",
-            controller::user_role_controller::get_routes().await,
-        )
+        .nest("/api/roles", role_controller::get_routes().await)
+        .nest("/api/user_roles", user_role_controller::get_routes().await)
         // .nest("/api", controller::auth_controller::get_routes().await)
-        .nest(
-            "/api/auth",
-            controller::auth_controller::get_logout_route().await,
-        )
+        .nest("/api/auth", auth_controller::get_logout_route().await)
         .route_layer(axum::middleware::from_fn_with_state(
             app_state.clone(),
             middlewares::auth_guard::auth_guard,
         ))
-        .nest(
-            "/api/auth",
-            controller::auth_controller::get_login_route().await,
-        )
+        .nest("/api/auth", auth_controller::get_login_route().await)
         .with_state(app_state)
         .fallback(fallback_handler)
         .layer(TraceLayer::new_for_http())
@@ -130,7 +143,14 @@ mod tests {
     async fn hello_world() {
         dotenv().ok();
 
-        let app = create_app().await;
+        let builder = config::Config::builder()
+            .add_source(config::Environment::default())
+            .build()
+            .unwrap();
+
+        let app_config: AppConfig = builder.try_deserialize().unwrap();
+
+        let app = create_app(app_config).await;
 
         let response = app
             .oneshot(

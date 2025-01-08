@@ -15,7 +15,11 @@ pub struct UserToken {
     pub refresh_token: Option<String>,
 }
 
-pub async fn create_user_token(subject: &str, expire_in_minutes: i64) -> String {
+pub async fn create_user_token(
+    subject: &str,
+    expire_in_minutes: i64,
+    jwt_secret: &str,
+) -> Result<String, String> {
     let now = Utc::now();
     let iat = now.timestamp() as usize;
     let exp = (now + Duration::minutes(expire_in_minutes)).timestamp() as usize;
@@ -26,14 +30,12 @@ pub async fn create_user_token(subject: &str, expire_in_minutes: i64) -> String 
         exp,
     };
 
-    let jwt_secret = std::env::var("JWT_SECRET").expect("JWT Secret not set.");
-
     let access_token = encode(
         &Header::default(),
         &token_claims,
         &EncodingKey::from_secret(jwt_secret.as_ref()),
     )
-    .expect("Cannot encode user token");
+    .map_err(|e| e.to_string());
 
     access_token
 }
