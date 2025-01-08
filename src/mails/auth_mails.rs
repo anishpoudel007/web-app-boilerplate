@@ -1,17 +1,31 @@
 use lettre::{
-    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
-    SmtpTransport, Transport as _,
+    message::{header::ContentType, MultiPart},
+    transport::smtp::authentication::Credentials,
+    Message, SmtpTransport, Transport as _,
 };
+use sailfish::TemplateSimple;
+
+#[derive(TemplateSimple)]
+#[template(path = "user_register_email.stpl")]
+struct UserRegisterTemplate {
+    username: String,
+}
 
 pub fn send_register_mail(subject: &str, to: &str) -> Result<(), String> {
+    let ctx = UserRegisterTemplate {
+        username: to.to_string(),
+    };
+
+    let email_body = ctx.render_once().unwrap();
+
     let from_email = std::env::var("FROM_EMAIL").unwrap();
 
     let email = Message::builder()
         .from(from_email.parse().unwrap())
         .to(to.parse().unwrap())
         .subject(subject)
-        .header(ContentType::TEXT_PLAIN)
-        .body(String::from("User successfully registered."))
+        .header(lettre::message::header::ContentType::TEXT_HTML)
+        .body(email_body)
         .map_err(|e| e.to_string())?;
 
     let username = std::env::var("SMTP_USERNAME").unwrap();

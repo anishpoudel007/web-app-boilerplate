@@ -1,0 +1,12 @@
+<html>
+  <style>
+  .username {
+      font-weight: bold;
+      color: red;
+    }
+  </style>
+  <body>
+    Welcome <span class="username"><%= username %></span>, You have successfully registered.
+  </body>
+</html>
+
