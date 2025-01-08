@@ -10,6 +10,7 @@ mod auth;
 mod controller;
 mod error;
 mod form;
+mod mails;
 mod middlewares;
 mod models;
 mod serializer;

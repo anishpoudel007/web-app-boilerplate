@@ -4,7 +4,8 @@ use crate::{
     api_response::JsonResponse,
     auth::jwt::{create_user_token, UserToken},
     error::AppError,
-    form::user_form::{CreateUserRequest, UserLogin, UserRegisterRequest},
+    form::user_form::{CreateUserRequest, UserLogin},
+    mails::auth_mails::send_register_mail,
     models::_entities::{user, user_profile},
     serializer::UserWithProfileSerializer,
     utils::verify_password,
@@ -51,8 +52,12 @@ pub async fn register(
         .await?;
 
     if user_exist.is_some() {
-        return Err(AppError::GenericError("User already exists.".to_string()));
+        return Err(AppError::GenericError(
+            "A user with this email or username already exists.".to_string(),
+        ));
     }
+
+    let user_email = payload.email.clone();
 
     let user_with_profile = app_state
         .db
@@ -82,6 +87,9 @@ pub async fn register(
 
     println!("{:#?}", user_serializer);
 
+    send_register_mail("User Registration Complete", &user_email)
+        .map_err(AppError::GenericError)?;
+
     Ok(JsonResponse::data(user_serializer, None))
 }
 
@@ -100,8 +108,18 @@ pub async fn login(
         return Err(AppError::GenericError("Invalid user".to_string()));
     }
 
-    let access_token = create_user_token(&user.email, 10).await;
-    let refresh_token = create_user_token(&user.email, 1440).await;
+    let access_token_expiration_minutes = std::env::var("ACCESS_TOKEN_EXPIRATION_MINUTES")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(10);
+
+    let refresh_token_expiration_minutes = std::env::var("ACCESS_TOKEN_EXPIRATION_MINUTES")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(1440);
+
+    let access_token = create_user_token(&user.email, access_token_expiration_minutes).await;
+    let refresh_token = create_user_token(&user.email, refresh_token_expiration_minutes).await;
 
     let user_token = UserToken {
         access_token,
