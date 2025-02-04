@@ -9,7 +9,7 @@ members = [".", "migration"]
 [dependencies]
 # Web framework and HTTP utilities
 axum = { version="0.8.0", features=["macros"] }
-tower-http = { version="0.6.2", features=["trace"] }
+tower-http = { version="0.6.2", features=["trace", "cors"] }
 
 # Asynchronous runtime
 tokio = { version="1.42.0", features=["full"] }

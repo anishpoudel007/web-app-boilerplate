@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
-use axum::{http::StatusCode, Router};
+use axum::{
+    http::{HeaderValue, Method, StatusCode},
+    Router,
+};
 use controller::{
     auth_controller, permission_controller, role_controller, user_controller, user_role_controller,
 };
 use sea_orm::{Database, DatabaseConnection};
 use serde::Deserialize;
 use tokio::{net::TcpListener, signal};
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 mod api_response;
 mod auth;
@@ -105,6 +108,11 @@ async fn create_app(app_config: AppConfig) -> Router {
         .with_state(app_state)
         .fallback(fallback_handler)
         .layer(TraceLayer::new_for_http())
+        .layer(
+            CorsLayer::new()
+                .allow_origin("http://localhost:8080".parse::<HeaderValue>().unwrap())
+                .allow_methods([Method::GET]),
+        )
 }
 
 async fn fallback_handler() -> StatusCode {

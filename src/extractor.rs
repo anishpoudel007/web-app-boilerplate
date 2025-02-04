@@ -1,11 +1,9 @@
-use std::error::Error;
-
 use axum::{
     extract::{rejection::JsonRejection, FromRequest, MatchedPath, Request},
     http::StatusCode,
-    RequestPartsExt as _,
+    Json, RequestPartsExt as _,
 };
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::api_response::JsonResponse;
 
@@ -13,7 +11,7 @@ pub struct ValidJson<T>(pub T);
 
 impl<S, T> FromRequest<S> for ValidJson<T>
 where
-    axum::Json<T>: FromRequest<S, Rejection = JsonRejection>,
+    Json<T>: FromRequest<S, Rejection = JsonRejection>,
     S: Send + Sync,
 {
     type Rejection = (StatusCode, JsonResponse);
@@ -35,7 +33,7 @@ where
 
         let req = Request::from_parts(parts, body);
 
-        match axum::Json::<T>::from_request(req, state).await {
+        match Json::<T>::from_request(req, state).await {
             Ok(value) => Ok(Self(value.0)),
             // convert the error from `axum::Json` into whatever we want
             Err(rejection) => {
@@ -45,14 +43,14 @@ where
                     "path": path,
                 });
 
-                Err((
-                    rejection.status(),
-                    JsonResponse::error(
-                        rejection.source().unwrap().to_string(),
-                        Some("Invalid request data.".to_string()),
-                    ),
-                ))
-                // Err((rejection.status(), axum::Json(payload)))
+                let status = rejection.status();
+
+                let payload = JsonResponse::error(
+                    rejection.body_text(),
+                    Some("Invalid request data.".to_string()),
+                );
+
+                Err((status, payload))
             }
         }
     }
