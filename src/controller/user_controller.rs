@@ -7,7 +7,7 @@ use axum::{
     extract::{OriginalUri, Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
+    Router,
 };
 use sea_orm::Condition;
 use sea_orm::{
@@ -104,7 +104,7 @@ pub async fn get_user(
         .find_also_related(user_profile::Entity)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?
         .into();
 
     Ok(JsonResponse::data(user, None))
@@ -173,7 +173,7 @@ pub async fn update_user(
     let user = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
 
     payload.validate()?;
 
@@ -248,7 +248,7 @@ pub async fn assign_roles(
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
 
     if payload.roles.is_empty() {
         return Err(AppError::GenericError("Empty roles".to_string()));
@@ -338,7 +338,7 @@ pub async fn assign_permissions(
     let user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
 
     if payload.permissions.is_empty() {
         return Err(AppError::GenericError("Empty permission.".to_string()));
@@ -405,7 +405,7 @@ pub async fn sync_permissions(
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
 
     let valid_permissions: HashSet<String> = permission::Entity::find()
         .filter(permission::Column::CodeName.is_in(&payload.permissions))
@@ -517,7 +517,7 @@ pub async fn sync_roles(
     let _user_model = user::Entity::find_by_id(user_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
 
     let valid_roles: HashSet<String> = role::Entity::find()
         .filter(role::Column::Name.is_in(&payload.roles))

@@ -148,7 +148,7 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request};
     use dotenvy::dotenv;
-    use tower::{Service, ServiceExt};
+    use tower::ServiceExt;
 
     #[tokio::test]
     async fn hello_world() {

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use hmac::{self, Hmac, Mac};
 use jsonwebtoken::{decode, DecodingKey, Validation};
-use sea_orm::ColumnTrait;
+use sea_orm::{ColumnTrait, DbErr};
 use sea_orm::{EntityTrait, QueryFilter};
 use sha2::Sha256;
 
@@ -46,7 +46,7 @@ pub async fn verify_token(app_state: Arc<AppState>, token: &str) -> Result<user:
         .filter(user::Column::Email.eq(token_claim.claims.sub))
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
 
     Ok(user)
 }

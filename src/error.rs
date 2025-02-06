@@ -1,65 +1,78 @@
+use crate::api_response::JsonResponse;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use sea_orm::error::DbErr;
+use serde_json::json;
+use std::collections::HashMap;
+use validator::ValidationErrors;
 
-use crate::api_response::JsonResponse;
-
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    DatabaseError(sqlx::Error),
+    #[error("{0}")]
     GenericError(String),
-    SeaOrm(sea_orm::DbErr),
-    Validation(validator::ValidationErrors),
+
+    #[error("SeaORM error: {0}")]
+    DatabaseError(#[from] DbErr),
+
+    #[error("Validation error: {0}")]
+    Validation(#[from] ValidationErrors),
+
+    #[error("Unauthorized access")]
     Unauthorized,
-}
-
-impl From<sqlx::Error> for AppError {
-    fn from(v: sqlx::Error) -> Self {
-        Self::DatabaseError(v)
-    }
-}
-
-impl From<sea_orm::DbErr> for AppError {
-    fn from(v: sea_orm::DbErr) -> Self {
-        Self::SeaOrm(v)
-    }
-}
-
-impl From<validator::ValidationErrors> for AppError {
-    fn from(value: validator::ValidationErrors) -> Self {
-        Self::Validation(value)
-    }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status_code, error_message) = match self {
-            AppError::DatabaseError(sqlx_error) => match sqlx_error {
-                sqlx::Error::Database(database_error) => {
-                    (StatusCode::NOT_FOUND, database_error.to_string())
+        let (status_code, err, message) = match self {
+            AppError::GenericError(msg) => (StatusCode::BAD_REQUEST, json!(msg), "Error".into()),
+
+            AppError::DatabaseError(db_err) => match db_err {
+                DbErr::RecordNotFound(msg) => {
+                    (StatusCode::NOT_FOUND, json!(msg), "Database Error".into())
                 }
-                sqlx::Error::RowNotFound => (StatusCode::NOT_FOUND, "Row not found".to_string()),
                 _ => (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Database Error".to_string(),
+                    json!("Database operation failed"),
+                    "Database Error".into(),
                 ),
             },
-            AppError::GenericError(e) => (StatusCode::BAD_REQUEST, e),
-            AppError::SeaOrm(db_err) => (StatusCode::NOT_FOUND, db_err.to_string()),
-            AppError::Validation(validation_errors) => {
-                (StatusCode::BAD_REQUEST, validation_errors.to_string())
+
+            AppError::Validation(errors) => {
+                let error_map = format_validation_errors(&errors);
+                let error_json = json!(error_map);
+                (
+                    StatusCode::BAD_REQUEST,
+                    error_json,
+                    "Validation Error".into(),
+                )
             }
+
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
-                "You are not authorized.".to_string(),
+                json!("Unauthorized access"),
+                "Authentication Error".into(),
             ),
         };
 
-        (
-            status_code,
-            JsonResponse::error(error_message, Some("Error".to_string())),
-        )
-            .into_response()
+        let payload = JsonResponse::error(err, Some(message));
+
+        (status_code, payload).into_response()
     }
+}
+
+/// Formats validation errors from `validator::ValidationErrors` into a structured `HashMap`.
+fn format_validation_errors(errors: &ValidationErrors) -> HashMap<String, Vec<String>> {
+    errors
+        .field_errors()
+        .iter()
+        .map(|(field, errs)| {
+            let messages = errs
+                .iter()
+                .filter_map(|e| e.message.as_ref().map(|msg| msg.to_string()))
+                .collect();
+            (field.to_string(), messages)
+        })
+        .collect()
 }

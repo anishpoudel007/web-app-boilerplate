@@ -4,9 +4,9 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     routing::get,
-    Extension, Json, Router,
+    Extension, Router,
 };
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, Set};
+use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, IntoActiveModel, Set};
 use validator::Validate;
 
 use crate::{
@@ -77,7 +77,7 @@ pub async fn get_permission(
     let permission_serializer: PermissionSerializer = permission::Entity::find_by_id(permission_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?
+        .ok_or(DbErr::RecordNotFound("Permission not found.".to_string()))?
         .into();
 
     Ok(JsonResponse::data(permission_serializer, None))
@@ -93,7 +93,7 @@ pub async fn update_permission(
     let permission = permission::Entity::find_by_id(permission_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("Permission not found.".to_string()))?;
 
     payload.validate()?;
 

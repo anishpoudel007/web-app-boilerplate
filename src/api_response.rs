@@ -90,10 +90,6 @@ impl ResponseMetadata {
     }
 }
 
-// error: [{"title": ["Row not found", "hello"]}, {"email": ["Not valid", ""]}]
-//
-//
-
 impl IntoResponse for JsonResponse {
     fn into_response(self) -> axum::response::Response {
         match self {

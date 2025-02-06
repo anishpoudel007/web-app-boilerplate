@@ -13,7 +13,7 @@ use crate::{
     AppState,
 };
 
-use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
+use axum::{extract::State, response::IntoResponse, routing::post, Router};
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait, Condition, EntityTrait, QueryFilter, Set,
     TransactionTrait as _,

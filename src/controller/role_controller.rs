@@ -4,9 +4,9 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     routing::get,
-    Extension, Json, Router,
+    Extension, Router,
 };
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, Set};
+use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, IntoActiveModel, Set};
 use validator::Validate;
 
 use crate::{
@@ -75,7 +75,7 @@ pub async fn get_role(
     let role_serializer: RoleSerializer = role::Entity::find_by_id(role_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?
+        .ok_or(DbErr::RecordNotFound("Role not found.".to_string()))?
         .into();
 
     Ok(JsonResponse::data(role_serializer, None))
@@ -91,7 +91,7 @@ pub async fn update_role(
     let role = role::Entity::find_by_id(role_id)
         .one(&app_state.db)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
+        .ok_or(DbErr::RecordNotFound("Role not found.".to_string()))?;
 
     payload.validate()?;
 
