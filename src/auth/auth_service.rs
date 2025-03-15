@@ -49,7 +49,7 @@ impl AuthService {
             .await?;
 
         if count == 0 {
-            return Err(AppError::Unauthorized);
+            return Err(AppError::Forbidden);
         }
 
         Ok(())

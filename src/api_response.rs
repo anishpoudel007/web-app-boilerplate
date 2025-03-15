@@ -28,7 +28,7 @@ pub struct DataResponse {
 #[derive(Debug, Serialize)]
 pub struct PaginatedResponse {
     pub data: Value,
-    pub _metadata: ResponseMetadata,
+    pub metadata: ResponseMetadata,
     pub message: String,
 }
 
@@ -69,7 +69,7 @@ impl JsonResponse {
         let default_message = String::from("Data retrieved successfully.");
 
         Self::Paginate(PaginatedResponse {
-            _metadata: metadata,
+            metadata,
             data: json!(data),
             message: message.unwrap_or(default_message),
         })

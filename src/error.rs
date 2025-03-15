@@ -21,6 +21,18 @@ pub enum AppError {
 
     #[error("Unauthorized access")]
     Unauthorized,
+
+    #[error("No Token Found.")]
+    EmptyToken,
+
+    #[error("Token Expired")]
+    InvalidToken,
+
+    #[error("Token Expired")]
+    TokenExpired,
+
+    #[error("Forbidden")]
+    Forbidden,
 }
 
 impl IntoResponse for AppError {
@@ -48,11 +60,31 @@ impl IntoResponse for AppError {
                     "Validation Error".into(),
                 )
             }
+            AppError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                json!("You are not allowed to access the resource"),
+                "Forbidden Access".into(),
+            ),
 
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
                 json!("Unauthorized access"),
                 "Authentication Error".into(),
+            ),
+            AppError::EmptyToken => (
+                StatusCode::FORBIDDEN,
+                json!("Token Not Found"),
+                "Empty Token".into(),
+            ),
+            AppError::InvalidToken => (
+                StatusCode::UNAUTHORIZED,
+                json!("Invalid Token"),
+                "Authentication Error".into(),
+            ),
+            AppError::TokenExpired => (
+                StatusCode::UNAUTHORIZED,
+                json!("Token Expired."),
+                "Token Expired.".into(),
             ),
         };
 
