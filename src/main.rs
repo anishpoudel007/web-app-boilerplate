@@ -7,7 +7,7 @@ use axum::{
 use controller::{
     auth_controller, permission_controller, role_controller, user_controller, user_role_controller,
 };
-use sea_orm::{Database, DatabaseConnection};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::Deserialize;
 use tokio::{net::TcpListener, signal};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -81,7 +81,11 @@ async fn main() {
 }
 
 async fn create_app(app_config: AppConfig) -> Router {
-    let db = Database::connect(&app_config.database_url)
+    let mut options = ConnectOptions::new(&app_config.database_url);
+
+    options.sqlx_logging(false);
+
+    let db = Database::connect(options)
         .await
         .expect("Cannot connect to a database");
 
