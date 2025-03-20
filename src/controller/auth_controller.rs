@@ -138,3 +138,63 @@ pub async fn login(
 }
 
 pub async fn logout() {}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use axum::{
+        body::{to_bytes, Body},
+        http::{header, Request, StatusCode},
+    };
+    use dotenvy::dotenv;
+    use serde_json::json;
+    use tower::ServiceExt as _;
+
+    use crate::{
+        api_response::ErrorResponse, configgg::AppConfig, routes::create_router, state::AppState,
+        utils::connect_to_database,
+    };
+
+    #[tokio::test]
+    async fn test_invalid_login() {
+        dotenv().ok();
+
+        let app_config = AppConfig::from_env().unwrap();
+
+        let app = create_router(Arc::new(AppState {
+            db: connect_to_database(&app_config.database_url).await.unwrap(),
+            config: app_config,
+        }))
+        .await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/auth/login")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    // .body(Body::empty())
+                    .body(Body::from(
+                        json!({"username":"anish", "password":"password"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let status = response.status();
+        let body_bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
+
+        let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
+
+        let expected_response = ErrorResponse {
+            error: json!("Invalid user"),
+            message: "Error".to_string(),
+        };
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(error_response, expected_response);
+    }
+}

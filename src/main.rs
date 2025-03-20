@@ -89,37 +89,4 @@ async fn shutdown_signal() {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::{
-        body::Body,
-        http::{Request, StatusCode},
-    };
-    use dotenvy::dotenv;
-    use tower::ServiceExt;
-
-    #[tokio::test]
-    async fn hello_world() {
-        dotenv().ok();
-
-        let app_config = AppConfig::from_env().unwrap();
-
-        let app = create_router(Arc::new(AppState {
-            db: connect_to_database(&app_config.database_url).await.unwrap(),
-            config: app_config,
-        }))
-        .await;
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/api/tasks")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-}
+mod tests {}
