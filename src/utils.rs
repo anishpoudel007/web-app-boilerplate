@@ -57,3 +57,11 @@ pub async fn verify_token(app_state: Arc<AppState>, token: &str) -> Result<user:
 
     Ok(user)
 }
+
+pub async fn connect_to_database(
+    database_url: &str,
+) -> Result<sea_orm::DatabaseConnection, sea_orm::DbErr> {
+    let mut options = sea_orm::ConnectOptions::new(database_url);
+    options.sqlx_logging(false);
+    sea_orm::Database::connect(options).await
+}
