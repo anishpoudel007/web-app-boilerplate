@@ -114,7 +114,7 @@ pub async fn delete_role(
         .exec(&app_state.db)
         .await?;
 
-    println!("{:?}", res);
+    tracing::info!("{:?}", res);
 
     Ok(JsonResponse::data(
         None::<String>,

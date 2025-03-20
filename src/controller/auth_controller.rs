@@ -80,7 +80,7 @@ pub async fn register(
         })
         .await
         .map_err(|e| {
-            println!("{:#?}", e);
+            tracing::error!("{:#?}", e);
             AppError::GenericError(e.to_string())
         })?; // should be database error
 

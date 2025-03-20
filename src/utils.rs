@@ -41,7 +41,7 @@ pub async fn verify_token(app_state: Arc<AppState>, token: &str) -> Result<user:
         &Validation::default(),
     )
     .map_err(|e| {
-        eprintln!("{}", e);
+        tracing::error!("{:#?}", e);
         match e.kind() {
             jsonwebtoken::errors::ErrorKind::InvalidToken => AppError::InvalidToken,
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
