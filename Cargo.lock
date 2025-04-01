@@ -3804,6 +3804,7 @@ dependencies = [
  "hmac",
  "jsonwebtoken",
  "lettre",
+ "mime",
  "sailfish",
  "sea-orm",
  "serde",

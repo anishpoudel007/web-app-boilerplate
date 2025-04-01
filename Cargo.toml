@@ -55,6 +55,7 @@ config = "0.15.7"
 
 # Error
 thiserror = "2.0.11"
+mime = "0.3.17"
 
 [dev-dependencies]
 # Development utilities

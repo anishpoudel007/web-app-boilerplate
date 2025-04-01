@@ -145,7 +145,7 @@ mod tests {
 
     use axum::{
         body::{to_bytes, Body},
-        http::{header, Request, StatusCode},
+        http::{self, header, Request, StatusCode},
     };
     use dotenvy::dotenv;
     use serde_json::json;
@@ -171,9 +171,9 @@ mod tests {
         let response = app
             .oneshot(
                 Request::builder()
+                    .method(http::Method::POST)
                     .uri("/api/auth/login")
-                    .method("POST")
-                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     // .body(Body::empty())
                     .body(Body::from(
                         json!({"username":"anish", "password":"password"}).to_string(),
