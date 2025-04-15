@@ -16,6 +16,7 @@ use crate::{
     extractor::ValidJson,
     form::role_form::{CreateRoleRequest, UpdateRoleRequest},
     models::_entities::{role, user},
+    repository::{Repository, RoleRepository},
     serializer::RoleSerializer,
     AppState,
 };
@@ -56,13 +57,23 @@ pub async fn create_role(
 
     payload.validate()?;
 
-    let role: RoleSerializer = payload
-        .into_active_model()
-        .insert(&app_state.db)
-        .await?
-        .into();
+    let role_repo = RoleRepository;
 
-    Ok(JsonResponse::data(role, None))
+    let role_active_model = payload.clone().into_active_model();
+
+    role_repo
+        .create(&app_state.db, role_active_model)
+        .await
+        .unwrap();
+
+    // let role: RoleSerializer = payload
+    //     .into_active_model()
+    //     .insert(&app_state.db)
+    //     .await?
+    //     .into();
+
+    Ok(())
+    // Ok(JsonResponse::data(role, None))
 }
 
 pub async fn get_role(

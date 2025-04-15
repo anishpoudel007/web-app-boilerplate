@@ -16,6 +16,7 @@ mod form;
 mod mails;
 mod middlewares;
 mod models;
+mod repository;
 mod routes;
 mod serializer;
 mod state;

@@ -4,7 +4,7 @@ use validator::Validate;
 
 use crate::models::_entities::role::ActiveModel;
 
-#[derive(Debug, Deserialize, Validate, DeriveIntoActiveModel)]
+#[derive(Debug, Deserialize, Validate, DeriveIntoActiveModel, Clone)]
 pub struct CreateRoleRequest {
     #[validate(length(min = 3, message = "Must have at least 3 characters"))]
     pub name: String,
