@@ -59,10 +59,8 @@ pub async fn create_role(
 
     let role_repo = RoleRepository;
 
-    let role_active_model = payload.clone().into_active_model();
-
     role_repo
-        .create(&app_state.db, role_active_model)
+        .create(&app_state.db, payload.into_active_model())
         .await
         .unwrap();
 
