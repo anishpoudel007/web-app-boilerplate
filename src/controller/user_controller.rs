@@ -9,11 +9,9 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use garde::Validate as _;
-use sea_orm::Condition;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DbErr, EntityTrait, ModelTrait,
-    QueryFilter, Set, TransactionTrait,
+    ActiveValue::NotSet, ColumnTrait, DbErr, EntityTrait, ModelTrait, QueryFilter, Set,
+    TransactionTrait,
 };
 
 use crate::AppState;
@@ -25,7 +23,7 @@ use crate::form::{
     role_form::{UpdateUserPermissionRequest, UpdateUserRolesRequest},
     user_form::{CreateUserRequest, UpdateUserRequest},
 };
-use crate::models::_entities::{permission, role, user, user_permission, user_profile, user_role};
+use crate::models::_entities::{permission, role, user, user_permission, user_role};
 use crate::repository::user_repository::UserRepository;
 use crate::serializer::{
     PermissionSerializer, RoleSerializer, UserSerializer, UserWithProfileSerializer,
@@ -97,49 +95,11 @@ pub async fn create_user(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "create_user").await?;
 
-    payload.validate_with(&app_state)?;
+    let user_repo = UserRepository::new(app_state.clone(), None);
+    let user_service = UserService::new(&user_repo);
 
-    // let user_repo = UserRepository::new(app_state.clone(), None);
-    //
-    // let user_service = UserService::new(&user_repo);
-
-    let user_exist = user::Entity::find()
-        .filter(
-            Condition::any()
-                .add(user::Column::Email.eq(&payload.email))
-                .add(user::Column::Username.eq(&payload.username)),
-        )
-        .one(&app_state.db)
-        .await?;
-
-    if user_exist.is_some() {
-        return Err(AppError::GenericError(
-            "A user with this email or username already exists.".to_string(),
-        ));
-    }
-
-    let user_with_profile = app_state
-        .db
-        .transaction::<_, (user::Model, Option<user_profile::Model>), DbErr>(|txn| {
-            Box::pin(async move {
-                let user = user::ActiveModel::from(payload.clone()).insert(txn).await?;
-
-                let user_profile = user_profile::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    user_id: Set(user.id),
-                    address: Set(Some(payload.address)),
-                    mobile_number: Set(Some(payload.mobile_number)),
-                }
-                .insert(txn)
-                .await?;
-
-                Ok((user, Some(user_profile)))
-            })
-        })
-        .await
-        .map_err(|e| AppError::GenericError(e.to_string()))?; // should be database error
-
-    let user_serializer = UserWithProfileSerializer::from(user_with_profile);
+    let user_serializer: UserWithProfileSerializer =
+        user_service.create_user(payload).await?.into();
 
     Ok(JsonResponse::data(user_serializer, None))
 }
@@ -153,26 +113,10 @@ pub async fn update_user(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "update_user").await?;
 
-    let user = user::Entity::find_by_id(user_id)
-        .one(&app_state.db)
-        .await?
-        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?;
+    let user_repo = UserRepository::new(app_state.clone(), None);
+    let user_service = UserService::new(&user_repo);
 
-    payload.validate()?;
-
-    let mut user: user::ActiveModel = user.into();
-
-    let password = match payload.password {
-        Some(pwd) => Set(pwd),
-        None => NotSet,
-    };
-
-    user.name = Set(payload.name);
-    user.username = Set(payload.username);
-    user.email = Set(payload.email);
-    user.password = password;
-
-    let user_serializer: UserSerializer = user.update(&app_state.db).await?.into();
+    let user_serializer: UserSerializer = user_service.update_user(user_id, payload).await?.into();
 
     Ok(JsonResponse::data(user_serializer, None))
 }
@@ -185,11 +129,10 @@ pub async fn delete_user(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "delete_user").await?;
 
-    let res = user::Entity::delete_by_id(user_id)
-        .exec(&app_state.db)
-        .await?;
+    let user_repo = UserRepository::new(app_state.clone(), None);
+    let user_service = UserService::new(&user_repo);
 
-    println!("{:?}", res);
+    user_service.delete_user(user_id).await?;
 
     Ok(JsonResponse::data(
         None::<String>,

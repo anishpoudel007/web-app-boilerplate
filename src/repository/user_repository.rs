@@ -1,10 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
-use sea_orm::{ColumnTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_orm::{
+    ActiveModelTrait as _, ActiveValue::Set, ColumnTrait, DbErr, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, TransactionTrait as _,
+};
 
 use crate::{
     api_response::ResponseMetadata,
     error::AppError,
+    form::user_form::{CreateUserRequest, UpdateUserRequest},
     models::_entities::{user, user_profile},
     serializer::UserWithProfileSerializer,
     state::AppState,
@@ -20,10 +24,42 @@ pub struct UserRepository {
 }
 
 impl RepositoryTrait for UserRepository {
-    async fn create(
-        &self,
-        payload: crate::form::user_form::CreateUserRequest,
-    ) -> Result<user::Model, AppError> {
+    async fn create(&self, payload: CreateUserRequest) -> Result<UserWithProfileModel, AppError> {
+        let user_with_profile = self
+            .app_state
+            .db
+            .transaction::<_, UserWithProfileModel, DbErr>(|txn| {
+                Box::pin(async move {
+                    let user = user::ActiveModel::from(payload.clone()).insert(txn).await?;
+
+                    let user_profile = user_profile::ActiveModel {
+                        id: sea_orm::ActiveValue::NotSet,
+                        user_id: Set(user.id),
+                        address: Set(Some(payload.address)),
+                        mobile_number: Set(Some(payload.mobile_number)),
+                    }
+                    .insert(txn)
+                    .await?;
+
+                    Ok((user, Some(user_profile)))
+                })
+            })
+            .await
+            .map_err(|e| AppError::GenericError(e.to_string()))?;
+
+        Ok(user_with_profile)
+    }
+
+    async fn delete(&self, id: i32) -> Result<(), AppError> {
+        let _ = user::Entity::delete_by_id(id)
+            .exec(&self.app_state.db)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn update(&self, id: i32, payload: UpdateUserRequest) -> Result<user::Model, AppError> {
+        let user: user::ActiveModel = payload.into();
         todo!()
     }
 }

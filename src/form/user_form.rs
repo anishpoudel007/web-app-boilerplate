@@ -3,7 +3,10 @@ use crate::{
     state::AppState,
     utils::hash,
 };
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveValue::{NotSet, Unchanged},
+    ColumnTrait, EntityTrait, QueryFilter, Set,
+};
 use std::sync::Arc;
 
 use serde::Deserialize;
@@ -106,6 +109,18 @@ pub struct UpdateUserRequest {
 
     #[garde(length(min = 8, max = 100))]
     pub password: Option<String>,
+}
+
+impl From<UpdateUserRequest> for ActiveModel {
+    fn from(value: UpdateUserRequest) -> Self {
+        Self {
+            name: Set(value.name),
+            username: Set(value.username),
+            email: Set(value.email),
+            password: value.password.map_or_else(|| NotSet, |x| Set(hash(&x))),
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, garde::Validate)]
