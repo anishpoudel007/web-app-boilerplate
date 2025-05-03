@@ -1,13 +1,14 @@
 use sea_orm::{DeriveIntoActiveModel, Set};
 use serde::Deserialize;
-use validator::Validate;
 
 use crate::models::_entities::permission::ActiveModel;
 
-#[derive(Debug, Deserialize, Validate, Clone, DeriveIntoActiveModel)]
+#[derive(Debug, Deserialize, garde::Validate, Clone, DeriveIntoActiveModel)]
 pub struct CreatePermissionRequest {
-    #[validate(length(min = 3, message = "Must have at least 3 characters"))]
+    #[garde(length(min = 5, max = 100))]
     pub name: String,
+
+    #[garde(length(min = 3, max = 50))]
     pub code_name: String,
 }
 
@@ -21,9 +22,11 @@ impl From<CreatePermissionRequest> for ActiveModel {
     }
 }
 
-#[derive(Debug, Deserialize, Validate, Clone, DeriveIntoActiveModel)]
+#[derive(Debug, Deserialize, garde::Validate, Clone, DeriveIntoActiveModel)]
 pub struct UpdatePermissionRequest {
-    #[validate(length(min = 3, message = "Must have at least 3 characters"))]
+    #[garde(length(min = 5, max = 100))]
     pub name: String,
+
+    #[garde(length(min = 3, max = 50))]
     pub code_name: String,
 }

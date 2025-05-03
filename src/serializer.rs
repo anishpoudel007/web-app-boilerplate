@@ -1,6 +1,9 @@
 use serde::Serialize;
 
-use crate::models::_entities::{permission, role, user, user_profile};
+use crate::{
+    models::_entities::{permission, role, user, user_profile},
+    repository::user_repository::UserWithProfileModel,
+};
 
 #[derive(Debug, Serialize)]
 pub struct UserSerializer {
@@ -47,8 +50,8 @@ pub struct UserWithProfileSerializer {
     pub profile: Option<UserProfileSerializer>,
 }
 
-impl From<(user::Model, Option<user_profile::Model>)> for UserWithProfileSerializer {
-    fn from(value: (user::Model, Option<user_profile::Model>)) -> Self {
+impl From<UserWithProfileModel> for UserWithProfileSerializer {
+    fn from(value: UserWithProfileModel) -> Self {
         let (user, profile) = value;
 
         let profile_serializer = profile.map(UserProfileSerializer::from);
@@ -61,16 +64,6 @@ impl From<(user::Model, Option<user_profile::Model>)> for UserWithProfileSeriali
             profile: profile_serializer,
         }
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct TaskSerializer {
-    pub id: i32,
-    pub title: String,
-    pub description: String,
-    pub status: String,
-    pub date_created: chrono::naive::NaiveDateTime,
-    pub date_updated: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

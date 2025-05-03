@@ -1,60 +1,74 @@
 [package]
 name = "web_app_boilerplate"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [workspace]
 members = [".", "migration"]
 
 [dependencies]
 # Web framework and HTTP utilities
-axum = { version="0.8.1", features=["macros"] }
-tower-http = { version="0.6.2", features=["trace", "cors"] }
+axum = { version = "0.8.3", features = ["macros"] }
+tower-http = { version = "0.6.2", features = ["trace", "cors"] }
 
 # Asynchronous runtime
-tokio = { version="1.43.0", features=["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 
 # Database and ORM
-sqlx = { version="0.8.3", features=["sqlite", "runtime-tokio", "tls-native-tls", "macros", "chrono"] }
-sea-orm = { version = "1.1.4", features = [ "sqlx-sqlite", "runtime-tokio-native-tls", "macros", "with-chrono", "debug-print" ] }
+sqlx = { version = "0.8.5", features = [
+  "sqlite",
+  "runtime-tokio",
+  "tls-native-tls",
+  "macros",
+  "chrono",
+] }
+sea-orm = { version = "1.1.10", features = [
+  "sqlx-sqlite",
+  "runtime-tokio-native-tls",
+  "macros",
+  "with-chrono",
+  "debug-print",
+] }
 
 # Date and time handling
-chrono = { version="0.4.39", features=["serde"] }
+chrono = { version = "0.4.40", features = ["serde"] }
 
 # Serialization and deserialization
-serde = { version = "1.0.217", features=["derive"] }
-serde_json = { version="1.0.138" }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = { version = "1.0.140" }
 
 # Environment variable management
-dotenvy = { version="0.15.7" }
+dotenvy = { version = "0.15.7" }
 
 # Logging and tracing
 tracing = "0.1.41"
-tracing-subscriber = { version="0.3.19", features=["env-filter", "ansi"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "ansi"] }
 
 # Input validation
-validator = { version="0.20.0", features=["derive"] }
+validator = { version = "0.20.0", features = ["derive"] }
+garde = { version = "0.22.0", features = ["full"] }
 
 # Async traits
-async-trait = "0.1.86"
+async-trait = "0.1.88"
 
 # Hashing and cryptography
-sha2 = { version="0.10.8" }
+sha2 = { version = "0.10.8" }
 hmac = "0.12.1"
 hex = "0.4.3"
-jsonwebtoken = "9.3.0"
+jsonwebtoken = "9.3.1"
 
 # Email handling
-lettre = { version="0.11.12" }
+lettre = { version = "0.11.15" }
 
 # Template engine
-sailfish = { version="0.9.0", features=["derive", "serde", "serde_json"]}
+sailfish = { version = "0.9.0", features = ["derive", "serde", "serde_json"] }
 
 # Config
-config = "0.15.7"
+config = "0.15.11"
 
 # Error
-thiserror = "2.0.11"
+thiserror = "2.0.12"
+mime = "0.3.17"
 
 [dev-dependencies]
 # Development utilities

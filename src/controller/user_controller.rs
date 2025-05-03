@@ -1,22 +1,23 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use axum::routing::delete;
 use axum::Extension;
+use axum::routing::delete;
 use axum::{
+    Router,
     extract::{OriginalUri, Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
+use garde::Validate as _;
 use sea_orm::Condition;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DbErr, EntityTrait, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    QueryFilter, Set, TransactionTrait,
 };
-use validator::Validate;
 
-use crate::api_response::{JsonResponse, ResponseMetadata};
+use crate::AppState;
+use crate::api_response::JsonResponse;
 use crate::auth::auth_service::AuthService;
 use crate::error::AppError;
 use crate::extractor::ValidJson;
@@ -25,10 +26,12 @@ use crate::form::{
     user_form::{CreateUserRequest, UpdateUserRequest},
 };
 use crate::models::_entities::{permission, role, user, user_permission, user_profile, user_role};
+use crate::repository::user_repository::UserRepository;
 use crate::serializer::{
     PermissionSerializer, RoleSerializer, UserSerializer, UserWithProfileSerializer,
 };
-use crate::AppState;
+use crate::service::service_trait::ServiceTrait;
+use crate::service::user_service::UserService;
 
 pub async fn get_routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -56,40 +59,18 @@ pub async fn get_users(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "read_users").await?;
 
-    let mut user_query = user::Entity::find().find_also_related(user_profile::Entity);
+    let user_repo = UserRepository::new(app_state.clone(), Some(original_uri.to_string()));
+    let user_service = UserService::new(&user_repo);
 
-    if let Some(name) = params.get("name") {
-        user_query = user_query.filter(user::Column::Name.contains(name));
-    }
+    let users_result = user_service.get_users(params).await.unwrap();
 
-    if let Some(username) = params.get("username") {
-        user_query = user_query.filter(user::Column::Username.contains(username));
-    }
-
-    if let Some(email) = params.get("email") {
-        user_query = user_query.filter(user::Column::Email.contains(email));
-    }
-
-    let page = params
-        .get("page")
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(1);
-
-    let users_count = user_query.clone().count(&app_state.db).await?;
-
-    let response_metadata =
-        ResponseMetadata::new(&app_state, users_count, original_uri.to_string());
-
-    let users: Vec<UserWithProfileSerializer> = user_query
-        .order_by(user::Column::DateCreated, sea_orm::Order::Desc)
-        .paginate(&app_state.db, app_state.config.per_page as u64)
-        .fetch_page(page - 1)
-        .await?
+    let users: Vec<UserWithProfileSerializer> = users_result
+        .0
         .into_iter()
         .map(UserWithProfileSerializer::from)
         .collect();
 
-    Ok(JsonResponse::paginate(users, response_metadata, None))
+    Ok(JsonResponse::paginate(users, users_result.1, None))
 }
 
 #[axum::debug_handler()]
@@ -100,12 +81,10 @@ pub async fn get_user(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "read_user").await?;
 
-    let user: UserWithProfileSerializer = user::Entity::find_by_id(user_id)
-        .find_also_related(user_profile::Entity)
-        .one(&app_state.db)
-        .await?
-        .ok_or(DbErr::RecordNotFound("User not found.".to_string()))?
-        .into();
+    let user_repo = UserRepository::new(app_state.clone(), None);
+    let user_service = UserService::new(&user_repo);
+
+    let user: UserWithProfileSerializer = user_service.get_user(user_id).await?.into();
 
     Ok(JsonResponse::data(user, None))
 }
@@ -118,7 +97,11 @@ pub async fn create_user(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "create_user").await?;
 
-    payload.validate()?;
+    payload.validate_with(&app_state)?;
+
+    // let user_repo = UserRepository::new(app_state.clone(), None);
+    //
+    // let user_service = UserService::new(&user_repo);
 
     let user_exist = user::Entity::find()
         .filter(

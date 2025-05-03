@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
 use axum::{
+    Extension, Router,
     extract::{Path, State},
     response::IntoResponse,
     routing::get,
-    Extension, Router,
 };
+use garde::Validate as _;
 use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, IntoActiveModel, Set};
-use validator::Validate;
+use validator::{Validate, ValidateArgs};
 
 use crate::{
+    AppState,
     api_response::JsonResponse,
     auth::auth_service::AuthService,
     error::AppError,
@@ -17,7 +19,6 @@ use crate::{
     form::role_form::{CreateRoleRequest, UpdateRoleRequest},
     models::_entities::{role, user},
     serializer::RoleSerializer,
-    AppState,
 };
 
 pub async fn get_routes() -> Router<Arc<AppState>> {
@@ -54,7 +55,7 @@ pub async fn create_role(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "create_role").await?;
 
-    payload.validate()?;
+    payload.validate_with(&app_state)?;
 
     let role: RoleSerializer = payload
         .into_active_model()

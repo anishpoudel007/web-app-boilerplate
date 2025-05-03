@@ -19,6 +19,9 @@ pub enum AppError {
     #[error("Validation error: {0}")]
     Validation(#[from] ValidationErrors),
 
+    #[error("Garde validation error: {0}")]
+    GardeValidation(#[from] garde::Report),
+
     #[error("Unauthorized access")]
     Unauthorized,
 
@@ -39,7 +42,6 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status_code, err, message) = match self {
             AppError::GenericError(msg) => (StatusCode::BAD_REQUEST, json!(msg), "Error".into()),
-
             AppError::DatabaseError(db_err) => match db_err {
                 DbErr::RecordNotFound(msg) => {
                     (StatusCode::NOT_FOUND, json!(msg), "Database Error".into())
@@ -50,7 +52,6 @@ impl IntoResponse for AppError {
                     "Database Error".into(),
                 ),
             },
-
             AppError::Validation(errors) => {
                 let error_map = format_validation_errors(&errors);
                 let error_json = json!(error_map);
@@ -65,7 +66,6 @@ impl IntoResponse for AppError {
                 json!("You are not allowed to access the resource"),
                 "Forbidden Access".into(),
             ),
-
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
                 json!("Unauthorized access"),
@@ -86,6 +86,15 @@ impl IntoResponse for AppError {
                 json!("Token Expired."),
                 "Token Expired.".into(),
             ),
+            AppError::GardeValidation(report) => {
+                let error_map = format_garde_validation_errors(report);
+                let error_json = json!(error_map);
+                (
+                    StatusCode::BAD_REQUEST,
+                    error_json,
+                    "Validation Error".into(),
+                )
+            }
         };
 
         let payload = JsonResponse::error(err, Some(message));
@@ -96,6 +105,7 @@ impl IntoResponse for AppError {
 
 /// Formats validation errors from `validator::ValidationErrors` into a structured `HashMap`.
 fn format_validation_errors(errors: &ValidationErrors) -> HashMap<String, Vec<String>> {
+    tracing::error!("{:#?}", errors);
     errors
         .field_errors()
         .iter()
@@ -107,4 +117,17 @@ fn format_validation_errors(errors: &ValidationErrors) -> HashMap<String, Vec<St
             (field.to_string(), messages)
         })
         .collect()
+}
+
+/// Formats validation errors from `garde::Report` into a structured `HashMap`.
+fn format_garde_validation_errors(report: garde::Report) -> HashMap<String, Vec<String>> {
+    tracing::error!("{:#?}", report);
+
+    report
+        .iter()
+        .fold(HashMap::new(), |mut acc, (path, error)| {
+            let key = path.to_string();
+            acc.entry(key).or_default().push(error.to_string());
+            acc
+        })
 }

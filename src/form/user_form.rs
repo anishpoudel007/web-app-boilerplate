@@ -1,25 +1,83 @@
-use crate::{models::_entities::user::ActiveModel, utils::hash};
-use sea_orm::Set;
+use crate::{
+    models::_entities::user::{self, ActiveModel},
+    state::AppState,
+    utils::hash,
+};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use std::sync::Arc;
 
 use serde::Deserialize;
-use validator::Validate;
 
-#[derive(Debug, Deserialize, Validate, Clone)]
+#[derive(Debug, Deserialize, Clone, garde::Validate)]
+#[garde(context(Arc<AppState>))]
 pub struct CreateUserRequest {
-    #[validate(length(min = 3, message = "Must have at least 3 characters."))]
+    #[garde(length(min = 3, max = 100))]
     pub name: String,
 
-    #[validate(length(min = 5, message = "Must have at least 5 characters."))]
+    #[garde(length(min = 5, max = 100))]
+    #[garde(custom(CreateUserRequest::validate_username_exists))]
     pub username: String,
 
-    #[validate(email(message = "Please provide valid email."))]
+    #[garde(email)]
+    #[garde(custom(CreateUserRequest::validate_email_exists))]
     pub email: String,
 
-    #[validate(length(min = 8, message = "Must have at least 8 characters"))]
+    #[garde(length(min = 8))]
     pub password: String,
 
+    #[garde(length(max = 200))]
     pub address: String,
+
+    #[garde(length(max = 50))]
     pub mobile_number: String,
+}
+
+impl CreateUserRequest {
+    fn validate_username_exists(value: &str, context: &Arc<AppState>) -> garde::Result {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match user::Entity::find()
+                    .filter(user::Column::Username.eq(value))
+                    .one(&context.db)
+                    .await
+                {
+                    Ok(Some(_)) => Err(garde::Error::new(
+                        "User with the given username already exists.",
+                    )),
+
+                    Ok(None) => Ok(()),
+
+                    Err(e) => {
+                        tracing::error!("Database error during role validation: {:?}", e);
+                        Err(garde::Error::new("Internal error during validation."))
+                    }
+                }
+            })
+        })
+    }
+    fn validate_email_exists(value: &str, context: &Arc<AppState>) -> garde::Result {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match user::Entity::find()
+                    .filter(user::Column::Email.eq(value))
+                    .one(&context.db)
+                    .await
+                {
+                    Ok(Some(_)) => Err(garde::Error::new(
+                        "User with the given email already exists.",
+                    )),
+
+                    Ok(None) => Ok(()),
+
+                    Err(e) => {
+                        tracing::error!("Database error during role validation: {:?}", e);
+
+                        Err(garde::Error::new("Internal error during validation."))
+                    }
+                }
+            })
+        })
+    }
 }
 
 impl From<CreateUserRequest> for ActiveModel {
@@ -34,32 +92,36 @@ impl From<CreateUserRequest> for ActiveModel {
     }
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, garde::Validate)]
 pub struct UpdateUserRequest {
-    #[validate(length(min = 3, message = "Must have at least 3 characters"))]
+    #[garde(length(min = 3, max = 100))]
     pub name: String,
 
+    #[garde(length(min = 3, max = 100))]
     pub username: String,
+
+    #[garde(email)]
+    #[garde(length(min = 3, max = 100))]
     pub email: String,
 
-    #[validate(length(min = 8, message = "Must have at least 8 characters"))]
+    #[garde(length(min = 8, max = 100))]
     pub password: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, garde::Validate)]
 pub struct UserLogin {
-    #[validate(length(min = 3, message = "Must have at least 3 characters"))]
+    #[garde(length(min = 3, max = 100))]
     pub username: String,
 
-    #[validate(length(min = 8, message = "Must have at least 8 characters"))]
+    #[garde(length(min = 8, max = 100))]
     pub password: String,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, garde::Validate)]
 pub struct UserRegisterRequest {
-    #[validate(length(min = 5, message = "Must have at least 3 characters"))]
+    #[garde(length(min = 3, max = 100))]
     pub username: String,
 
-    #[validate(length(min = 8, message = "Must have at least 8 characters"))]
+    #[garde(length(min = 8, max = 100))]
     pub password: String,
 }

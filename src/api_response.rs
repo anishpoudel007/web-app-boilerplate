@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{response::IntoResponse, Json};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::AppState;
@@ -13,7 +13,7 @@ pub enum JsonResponse {
     Paginate(PaginatedResponse),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ErrorResponse {
     pub error: Value,
     pub message: String,

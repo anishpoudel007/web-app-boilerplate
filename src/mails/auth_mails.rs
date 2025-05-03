@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use lettre::{
-    message::{header::ContentType, MultiPart},
     transport::smtp::authentication::Credentials,
     Message, SmtpTransport, Transport as _,
 };

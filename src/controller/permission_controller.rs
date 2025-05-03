@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use axum::{
+    Extension, Router,
     extract::{Path, State},
     response::IntoResponse,
     routing::get,
-    Extension, Router,
 };
+use garde::Validate as _;
 use sea_orm::{ActiveModelTrait, DbErr, EntityTrait, IntoActiveModel, Set};
-use validator::Validate;
 
 use crate::{
+    AppState,
     api_response::JsonResponse,
     auth::auth_service::AuthService,
     error::AppError,
@@ -17,7 +18,6 @@ use crate::{
     form::permission_form::CreatePermissionRequest,
     models::_entities::{permission, user},
     serializer::PermissionSerializer,
-    AppState,
 };
 
 pub async fn get_routes() -> Router<Arc<AppState>> {
