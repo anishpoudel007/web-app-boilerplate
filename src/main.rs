@@ -13,6 +13,7 @@ mod controller;
 mod error;
 mod extractor;
 mod form;
+mod json_response;
 mod mails;
 mod middlewares;
 mod models;

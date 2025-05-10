@@ -23,6 +23,7 @@ use crate::form::{
     role_form::{UpdateUserPermissionRequest, UpdateUserRolesRequest},
     user_form::{CreateUserRequest, UpdateUserRequest},
 };
+use crate::json_response::JsonResponse2;
 use crate::models::_entities::{permission, role, user, user_permission, user_role};
 use crate::repository::user_repository::UserRepository;
 use crate::serializer::{
@@ -57,6 +58,8 @@ pub async fn get_users(
 ) -> Result<impl IntoResponse, AppError> {
     AuthService::has_permission(&app_state, &user_model, "read_users").await?;
 
+    tracing::error!("{}", original_uri);
+
     let user_repo = UserRepository::new(app_state.clone(), Some(original_uri.to_string()));
     let user_service = UserService::new(&user_repo);
 
@@ -68,7 +71,9 @@ pub async fn get_users(
         .map(UserWithProfileSerializer::from)
         .collect();
 
-    Ok(JsonResponse::paginate(users, users_result.1, None))
+    // Ok(JsonResponse::paginate(users, users_result.1, None))
+    // return JsonResponse2::error("error");
+    Ok(JsonResponse2::paginated(users, users_result.1).with_message("Hello"))
 }
 
 #[axum::debug_handler()]

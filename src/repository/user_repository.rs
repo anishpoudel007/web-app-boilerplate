@@ -9,6 +9,7 @@ use crate::{
     api_response::ResponseMetadata,
     error::AppError,
     form::user_form::{CreateUserRequest, UpdateUserRequest},
+    json_response::ResponseMetadata2,
     models::_entities::{user, user_profile},
     serializer::UserWithProfileSerializer,
     state::AppState,
@@ -66,16 +67,22 @@ impl RepositoryTrait for UserRepository {
 
 impl UserRepository {
     pub fn new(app_state: Arc<AppState>, original_url: Option<String>) -> Self {
+        let full_url = format!(
+            "{}{}",
+            app_state.config.server_address,
+            original_url.unwrap()
+        );
+
         Self {
             app_state,
-            original_url,
+            original_url: Some(full_url),
         }
     }
 
     pub async fn filter_users(
         &self,
         filters: HashMap<String, String>,
-    ) -> Result<(Vec<UserWithProfileModel>, ResponseMetadata), AppError> {
+    ) -> Result<(Vec<UserWithProfileModel>, ResponseMetadata2), AppError> {
         let mut user_query = user::Entity::find().find_also_related(user_profile::Entity);
 
         if let Some(name) = filters.get("name") {
@@ -97,7 +104,7 @@ impl UserRepository {
 
         let users_count = user_query.clone().count(&self.app_state.db).await?;
 
-        let response_metadata = ResponseMetadata::new(
+        let response_metadata = ResponseMetadata2::new(
             &self.app_state,
             users_count,
             self.original_url.clone().unwrap(),

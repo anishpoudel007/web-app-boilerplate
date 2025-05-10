@@ -12,6 +12,7 @@ use crate::{
     api_response::ResponseMetadata,
     error::AppError,
     form::user_form::{CreateUserRequest, UpdateUserRequest},
+    json_response::ResponseMetadata2,
     models::_entities::{user, user_profile},
     repository::{
         repository_trait::RepositoryTrait,
@@ -42,7 +43,7 @@ impl ServiceTrait for UserService<'_> {
     async fn get_users(
         &self,
         filters: HashMap<String, String>,
-    ) -> Result<(Vec<UserWithProfileModel>, ResponseMetadata), AppError> {
+    ) -> Result<(Vec<UserWithProfileModel>, ResponseMetadata2), AppError> {
         // convert filters into string to make key for cache
         let user = self.repo.filter_users(filters).await;
         user
