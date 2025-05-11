@@ -37,16 +37,16 @@ impl<'a> UserService<'a> {
 impl ServiceTrait for UserService<'_> {
     async fn get_user(&self, id: i32) -> Result<UserWithProfileModel, AppError> {
         // id can also be used as cache key ??
-        let user = self.repo.find_by_id(id).await;
-        user
+
+        self.repo.find_by_id(id).await
     }
     async fn get_users(
         &self,
         filters: HashMap<String, String>,
     ) -> Result<(Vec<UserWithProfileModel>, ResponseMetadata2), AppError> {
         // convert filters into string to make key for cache
-        let user = self.repo.filter_users(filters).await;
-        user
+
+        self.repo.filter_users(filters).await
     }
 
     async fn create_user(

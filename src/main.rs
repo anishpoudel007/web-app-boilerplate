@@ -33,6 +33,8 @@ async fn main() {
     if app_config.app_debug {
         tracing_subscriber::fmt()
             .with_max_level(tracing::Level::DEBUG)
+            .without_time()
+            // .with_target(false)
             .pretty()
             .with_ansi(true)
             .init();
